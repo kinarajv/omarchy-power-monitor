@@ -17,7 +17,7 @@ Panel {
   property var hardware: ({})
   property var cpuHistory: []
   property var memoryHistory: []
-  property int historyLimit: 30
+  property int historyLimit: setting("historyLimit", 30)
   property var profiles: []
   property string activeProfile: ""
   property int profileIndex: 0
@@ -250,7 +250,7 @@ Panel {
     onExited: root.refresh()
   }
 
-  Timer { interval: 5000; running: root.opened; repeat: true; onTriggered: root.refresh() }
+  Timer { interval: setting("refreshInterval", 5000); running: root.opened; repeat: true; onTriggered: root.refresh() }
 
   Timer {
     id: phraseTimer

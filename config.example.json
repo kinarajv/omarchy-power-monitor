@@ -1,0 +1,9 @@
+{
+  "tempSensorName": "k10temp",
+  "tempSensorLabel": "Tctl",
+  "powerSensorName": "amdgpu",
+  "powerSensorLabel": "PPT",
+  "sampleDelaySeconds": 0.25,
+  "refreshIntervalMs": 5000,
+  "historySampleLimit": 30
+}
