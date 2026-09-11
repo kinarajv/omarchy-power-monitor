@@ -53,7 +53,7 @@ When clicked or triggered via IPC (`quickshell ipc call omarchy.power open`):
 Clone this repository directly into your user plugin path:
 
 ```bash
-git clone https://github.com/<your-username>/omarchy-power-monitor.git ~/.config/omarchy/plugins/kinara.power
+git clone https://github.com/kinarajv/omarchy-power-monitor.git ~/.config/omarchy/plugins/kinara.power
 chmod +x ~/.config/omarchy/plugins/kinara.power/hardware-stats
 ```
 
