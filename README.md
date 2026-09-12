@@ -105,41 +105,31 @@ for n in /sys/class/hwmon/hwmon*/name; do echo "Device: $(cat $n) in $(dirname $
 
 ## Installation
 
-### 1. Clone into Omarchy Plugin Directory
+### Method 1: Using the Omarchy Plugin Manager (Recommended)
+Install and enable the plugin directly from GitHub using the Omarchy CLI:
+
+```bash
+omarchy plugin add https://github.com/kinarajv/omarchy-power-monitor.git --enable
+```
+
+### Method 2: Manual Installation
 Clone this repository directly into your user plugin path:
 
 ```bash
-git clone https://github.com/kinarajv/omarchy-power-monitor.git ~/.config/omarchy/plugins/kinara.power
-chmod +x ~/.config/omarchy/plugins/kinara.power/hardware-stats
+git clone https://github.com/kinarajv/omarchy-power-monitor.git ~/.config/omarchy/plugins/kinarajv.power-monitor
+chmod +x ~/.config/omarchy/plugins/kinarajv.power-monitor/hardware-stats
 ```
 
-### 2. Optional: Configure Custom Sensors
+Optional sensor customization:
 ```bash
-cd ~/.config/omarchy/plugins/kinara.power
+cd ~/.config/omarchy/plugins/kinarajv.power-monitor
 cp config.example.json config.json
 ```
 
-### 3. Enable in Omarchy Shell Configuration
-Open `~/.config/omarchy/shell.json` in your editor and locate the `bar` items array. Replace `omarchy.power` with `kinara.power`:
-
-```json
-{
-  "plugins": {
-    "bar": [
-      "omarchy.workspace-switcher",
-      "omarchy.media-player",
-      "kinara.power",
-      "omarchy.clock"
-    ]
-  }
-}
-```
-
-### 4. Reload the Shell
-Reload Quickshell to apply the plugin:
+Enable the plugin in `~/.config/omarchy/shell.json` by adding `"kinarajv.power-monitor"` to the `bar` list, then reload:
 
 ```bash
-quickshell ipc -p /usr/share/omarchy/shell call omarchy.power open 2>/dev/null || systemctl --user restart quickshell
+omarchy plugin enable kinarajv.power-monitor
 ```
 
 ---
@@ -172,13 +162,18 @@ journalctl --user -u quickshell -n 50 --no-pager
 ---
 
 ## Uninstallation
+ 
+### Using the Plugin Manager:
+```bash
+omarchy plugin disable kinarajv.power-monitor
+omarchy plugin remove kinarajv.power-monitor --yes
+```
 
-To revert to the stock Omarchy power widget:
-
-1. Restore `omarchy.power` in `~/.config/omarchy/shell.json`.
-2. Remove the plugin directory:
+### Manual Removal:
+1. Remove `kinarajv.power-monitor` from `~/.config/omarchy/shell.json`.
+2. Delete the plugin directory:
    ```bash
-   rm -rf ~/.config/omarchy/plugins/kinara.power
+   rm -rf ~/.config/omarchy/plugins/kinarajv.power-monitor
    ```
 3. Restart Quickshell:
    ```bash

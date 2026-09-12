@@ -241,7 +241,12 @@ Panel {
 
   Process {
     id: hardwareProc
-    command: [Quickshell.env("HOME") + "/.config/omarchy/plugins/kinara.power/hardware-stats"]
+    command: [
+      "bash", "-c",
+      'for p in "$1/hardware-stats" "$HOME/.config/omarchy/plugins/kinarajv.power-monitor/hardware-stats" "$HOME/.config/omarchy/plugins/kinara.power/hardware-stats"; do [ -x "$p" ] && exec "$p"; done',
+      "_",
+      Qt.resolvedUrl(".").toString().replace(/^file:\/\//, "").replace(/\/$/, "")
+    ]
     stdout: StdioCollector { waitForEnd: true; onStreamFinished: root.updateHardware(text) }
   }
 

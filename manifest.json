@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "kinara.power",
+  "id": "kinarajv.power-monitor",
   "name": "Omarchy Power Monitor",
   "version": "1.0.0",
-  "author": "Omarchy Contributor",
+  "author": "Kinara Jongga Varga",
   "license": "MIT",
   "description": "Battery status, power profile picker, CPU load/temp/wattage, RAM usage, and dynamic btop-style history graphs for Omarchy Quickshell.",
   "kinds": [
@@ -13,10 +13,11 @@
     "barWidget": "Panel.qml"
   },
   "barWidget": {
-    "displayName": "Power & System",
+    "displayName": "Power & Hardware Monitor",
     "description": "Battery, power profile, and live system resource graphs",
     "category": "System",
-    "allowMultiple": false
+    "allowMultiple": false,
+    "defaultSection": "right"
   },
   "omarchy": {
     "clonedFrom": "omarchy.power"
