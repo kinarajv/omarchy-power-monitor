@@ -129,13 +129,45 @@ Panel {
     return modeLabel()
   }
 
-  function refresh() {
-    if (!batteryPresent) return
+  function pluginFile(relative) {
+    var url = String(Qt.resolvedUrl(relative))
+    if (url.indexOf("file://") === 0) url = url.slice(7)
+    try { url = decodeURIComponent(url) } catch (e) {}
+    return url
+  }
+  readonly property string hardwareScript: pluginFile("hardware-stats")
 
-    if (!batteryProc.running) batteryProc.running = true
-    if (!profilesProc.running) profilesProc.running = true
-    if (!systemProc.running) systemProc.running = true
-    if (!hardwareProc.running) hardwareProc.running = true
+  readonly property var childEnvironment: ({
+    "HOME": null,
+    "PATH": "/usr/bin:/bin",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8"
+  })
+
+  function refresh() {
+    if (!batteryPresent || !root.opened) return
+
+    if (!batteryProc.running) {
+      batteryProc.buffer = ""
+      batteryProc.lines = 0
+      batteryProc.running = true
+    }
+    if (!profilesProc.running) {
+      profilesProc.buffer = ""
+      profilesProc.lines = 0
+      profilesProc.running = true
+    }
+    if (!systemProc.running) {
+      systemProc.buffer = ""
+      systemProc.lines = 0
+      systemProc.running = true
+    }
+    if (!hardwareProc.running) {
+      hardwareProc.buffer = ""
+      hardwareProc.lines = 0
+      hardwareProc.running = true
+    }
+    pollWatchdog.restart()
   }
 
   function updateKeyValue(raw, targetName) {
@@ -181,8 +213,9 @@ Panel {
 
   function setProfile(profile) {
     if (!profile || actionProc.running) return
-    actionProc.command = ["omarchy-powerprofiles-set", root.discharging ? "battery" : "ac", profile]
+    actionProc.command = ["/usr/bin/omarchy-powerprofiles-set", root.discharging ? "battery" : "ac", profile]
     actionProc.running = true
+    actionWatchdog.restart()
   }
 
   function togglePercentage() {
@@ -212,6 +245,12 @@ Panel {
       var idx = profiles.indexOf(activeProfile)
       profileIndex = idx >= 0 ? idx : 0
       cursorActive = false
+    } else {
+      if (batteryProc.running) batteryProc.running = false
+      if (profilesProc.running) profilesProc.running = false
+      if (systemProc.running) systemProc.running = false
+      if (hardwareProc.running) hardwareProc.running = false
+      pollWatchdog.stop()
     }
   }
 
@@ -223,36 +262,122 @@ Panel {
 
   Process {
     id: batteryProc
-    command: ["omarchy-battery-status", "--shell"]
-    stdout: StdioCollector { waitForEnd: true; onStreamFinished: root.updateKeyValue(text, "battery") }
+    command: ["/usr/bin/omarchy-battery-status", "--shell"]
+    environment: root.childEnvironment
+    clearEnvironment: true
+    property string buffer: ""
+    property int lines: 0
+    stdout: SplitParser {
+      splitMarker: "\n"
+      onRead: function(line) {
+        if (batteryProc.lines < 30 && batteryProc.buffer.length < 2048) {
+          batteryProc.buffer += line + "\n"
+          batteryProc.lines++
+        }
+      }
+    }
+    onExited: {
+      root.updateKeyValue(batteryProc.buffer, "battery")
+      batteryProc.buffer = ""
+      batteryProc.lines = 0
+    }
   }
 
   Process {
     id: profilesProc
-    command: ["omarchy-powerprofiles-list", "--active-state"]
-    stdout: StdioCollector { waitForEnd: true; onStreamFinished: root.updateProfiles(text) }
+    command: ["/usr/bin/omarchy-powerprofiles-list", "--active-state"]
+    environment: root.childEnvironment
+    clearEnvironment: true
+    property string buffer: ""
+    property int lines: 0
+    stdout: SplitParser {
+      splitMarker: "\n"
+      onRead: function(line) {
+        if (profilesProc.lines < 10 && profilesProc.buffer.length < 1024) {
+          profilesProc.buffer += line + "\n"
+          profilesProc.lines++
+        }
+      }
+    }
+    onExited: {
+      root.updateProfiles(profilesProc.buffer)
+      profilesProc.buffer = ""
+      profilesProc.lines = 0
+    }
   }
 
   Process {
     id: systemProc
-    command: ["omarchy-system-stats"]
-    stdout: StdioCollector { waitForEnd: true; onStreamFinished: root.updateKeyValue(text, "system") }
+    command: ["/usr/bin/omarchy-system-stats"]
+    environment: root.childEnvironment
+    clearEnvironment: true
+    property string buffer: ""
+    property int lines: 0
+    stdout: SplitParser {
+      splitMarker: "\n"
+      onRead: function(line) {
+        if (systemProc.lines < 20 && systemProc.buffer.length < 1024) {
+          systemProc.buffer += line + "\n"
+          systemProc.lines++
+        }
+      }
+    }
+    onExited: {
+      root.updateKeyValue(systemProc.buffer, "system")
+      systemProc.buffer = ""
+      systemProc.lines = 0
+    }
   }
 
   Process {
     id: hardwareProc
-    command: [
-      "bash", "-c",
-      'for p in "$1/hardware-stats" "$HOME/.config/omarchy/plugins/kinarajv.power-monitor/hardware-stats" "$HOME/.config/omarchy/plugins/kinara.power/hardware-stats"; do [ -x "$p" ] && exec "$p"; done',
-      "_",
-      Qt.resolvedUrl(".").toString().replace(/^file:\/\//, "").replace(/\/$/, "")
-    ]
-    stdout: StdioCollector { waitForEnd: true; onStreamFinished: root.updateHardware(text) }
+    command: ["/usr/bin/python3", "-I", root.hardwareScript]
+    environment: root.childEnvironment
+    clearEnvironment: true
+    property string buffer: ""
+    property int lines: 0
+    stdout: SplitParser {
+      splitMarker: "\n"
+      onRead: function(line) {
+        if (hardwareProc.lines < 20 && hardwareProc.buffer.length < 2048) {
+          hardwareProc.buffer += line + "\n"
+          hardwareProc.lines++
+        }
+      }
+    }
+    onExited: {
+      root.updateHardware(hardwareProc.buffer)
+      hardwareProc.buffer = ""
+      hardwareProc.lines = 0
+    }
   }
 
   Process {
     id: actionProc
+    environment: root.childEnvironment
+    clearEnvironment: true
     onExited: root.refresh()
+  }
+
+  Timer {
+    id: actionWatchdog
+    interval: 4000
+    repeat: false
+    onTriggered: {
+      if (actionProc.running) actionProc.running = false
+    }
+  }
+
+  Timer {
+    id: pollWatchdog
+    interval: 3500
+    repeat: false
+    onTriggered: {
+      if (batteryProc.running) batteryProc.running = false
+      if (profilesProc.running) profilesProc.running = false
+      if (systemProc.running) systemProc.running = false
+      if (hardwareProc.running) hardwareProc.running = false
+    }
   }
 
   Timer { interval: setting("refreshInterval", 5000); running: root.opened; repeat: true; onTriggered: root.refresh() }
