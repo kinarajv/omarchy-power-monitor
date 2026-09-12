@@ -2,6 +2,10 @@
 
 A high-performance Quickshell panel and top-bar widget for Omarchy Linux that extends the default battery indicator with live hardware telemetry, power profiles, and btop-style dynamic resource graphs.
 
+<p align="center">
+  <img src="preview.png" alt="Omarchy Power & Hardware Monitor Preview" width="100%">
+</p>
+
 ---
 
 ## Overview
