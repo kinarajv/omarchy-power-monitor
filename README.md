@@ -47,10 +47,17 @@ When clicked or triggered via IPC (`quickshell ipc call omarchy.power open`):
 ### Battery Charging Limiter Controls
 
 The battery bar functions as both a charge progress meter and an interactive hardware charge limiter:
-- **Click or Drag**: Move the slider knob or click anywhere along the track (50%–100%) to set the hardware charge ceiling. Common thresholds (60%, 80%, 100%) snap automatically.
+- **Click or Drag**: Move the slider knob or click anywhere along the track (50%–100%) to set the hardware charge ceiling.
 - **Right-Click**: Quickly toggles between battery preservation mode (80% Safe) and full charge (100% Max).
 - **Mouse Wheel**: Scroll up or down over the bar to step the limit by 5%.
-- **Hardware Integration**: Sets thresholds through native UPower D-Bus (unprivileged) or directly via `/sys/class/power_supply/BAT*/charge_control_end_threshold`.
+- **Modes**:
+  - **Out of the Box (Unprivileged)**: Uses UPower D-Bus, supporting binary manufacturer presets (`80% PRESET` and `100% OFF`).
+  - **Custom Percentage Mode (Arbitrary % like 89%)**: Run the included one-time rule setup script to grant user write access to the kernel sysfs node:
+    ```bash
+    cd ~/.config/omarchy/plugins/kinara.power
+    sudo ./setup-udev-rules.sh
+    ```
+    Once installed, any custom percentage (such as 89%, 85%, 60%) can be set freely from the slider without root password prompts.
 
 ---
 

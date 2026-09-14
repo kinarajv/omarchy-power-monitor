@@ -24,6 +24,7 @@ Panel {
   property bool cursorActive: false
   property int chargeLimit: 100
   property bool chargeLimitSupported: true
+  property bool chargeLimitWritable: false
   property int draggingLimit: -1
   readonly property bool showPercentage: setting("showPercentage", false) === true
 
@@ -217,6 +218,9 @@ Panel {
     }
     if (next.charge_limit_supported !== undefined) {
       root.chargeLimitSupported = (next.charge_limit_supported === "true")
+    }
+    if (next.charge_limit_writable !== undefined) {
+      root.chargeLimitWritable = (next.charge_limit_writable === "true")
     }
   }
 
@@ -580,7 +584,9 @@ Panel {
               anchors.right: parent.right
               text: root.draggingLimit >= 0
                 ? (root.draggingLimit >= 100 ? "SET: 100% (OFF)" : "SET LIMIT: " + root.draggingLimit + "%")
-                : (root.chargeLimit < 100 ? "LIMIT: " + root.chargeLimit + "%" : "LIMIT: OFF (100%)")
+                : (!root.chargeLimitWritable && root.chargeLimit < 100
+                    ? "LIMIT: " + root.chargeLimit + "% (PRESET)"
+                    : (root.chargeLimit < 100 ? "LIMIT: " + root.chargeLimit + "%" : "LIMIT: OFF (100%)"))
               color: (root.draggingLimit >= 0 || root.chargeLimit < 100) ? Color.accent : Qt.darker(root.bar.foreground, 1.4)
               font.family: root.bar.fontFamily
               font.pixelSize: Style.font.caption
@@ -672,9 +678,9 @@ Panel {
               function calculatePercent(mouseX) {
                 var frac = Math.max(0, Math.min(1, mouseX / barTrack.width))
                 var raw = Math.round(frac * 100)
-                if (Math.abs(raw - 60) <= 3) raw = 60
-                else if (Math.abs(raw - 80) <= 3) raw = 80
-                else if (raw >= 97) raw = 100
+                if (!root.chargeLimitWritable) {
+                  return raw >= 95 ? 100 : 80
+                }
                 return Math.max(50, Math.min(100, raw))
               }
 

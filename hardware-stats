@@ -33,10 +33,11 @@ def get_charge_limit():
     for p in glob.glob("/sys/class/power_supply/BAT*/charge_control_end_threshold"):
         try:
             val = int(Path(p).read_text().strip())
-            return True, val
+            writable = os.access(p, os.W_OK)
+            return True, val, writable
         except Exception:
-            return True, 100
-    return False, 100
+            return True, 100, False
+    return False, 100, False
 
 def set_charge_limit(val):
     val = max(50, min(100, int(val)))
@@ -65,7 +66,7 @@ def set_charge_limit(val):
         "true" if enable else "false"
     ], capture_output=True, text=True)
 
-    _, current = get_charge_limit()
+    _, current, _ = get_charge_limit()
     return p.returncode == 0, current
 
 if len(sys.argv) > 1 and sys.argv[1] == "--set-limit":
@@ -162,7 +163,7 @@ ram_total = meminfo.get("MemTotal", 1)
 ram_available = meminfo.get("MemAvailable", 0)
 ram_used = max(0, ram_total - ram_available)
 
-charge_supported, charge_limit = get_charge_limit()
+charge_supported, charge_limit, charge_writable = get_charge_limit()
 
 print(f"cpu_percent={cpu_percent:.0f}%")
 print(f"cpu_temp={cpu_temp}")
@@ -173,3 +174,4 @@ print(f"ram_free={gib(ram_available)}")
 print(f"ram_percent={ram_used * 100 / ram_total:.1f}")
 print(f"charge_limit={charge_limit}")
 print(f"charge_limit_supported={'true' if charge_supported else 'false'}")
+print(f"charge_limit_writable={'true' if charge_writable else 'false'}")
