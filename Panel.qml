@@ -266,20 +266,22 @@ Panel {
     environment: root.childEnvironment
     clearEnvironment: true
     property string buffer: ""
-    property int lines: 0
+    property int bytesRead: 0
     stdout: SplitParser {
-      splitMarker: "\n"
-      onRead: function(line) {
-        if (batteryProc.lines < 30 && batteryProc.buffer.length < 2048) {
-          batteryProc.buffer += line + "\n"
-          batteryProc.lines++
+      splitMarker: ""
+      onRead: function(chunk) {
+        batteryProc.bytesRead += chunk.length
+        if (batteryProc.bytesRead > 2048) {
+          batteryProc.running = false
+          return
         }
+        batteryProc.buffer += chunk
       }
     }
     onExited: {
       root.updateKeyValue(batteryProc.buffer, "battery")
       batteryProc.buffer = ""
-      batteryProc.lines = 0
+      batteryProc.bytesRead = 0
     }
   }
 
@@ -289,20 +291,22 @@ Panel {
     environment: root.childEnvironment
     clearEnvironment: true
     property string buffer: ""
-    property int lines: 0
+    property int bytesRead: 0
     stdout: SplitParser {
-      splitMarker: "\n"
-      onRead: function(line) {
-        if (profilesProc.lines < 10 && profilesProc.buffer.length < 1024) {
-          profilesProc.buffer += line + "\n"
-          profilesProc.lines++
+      splitMarker: ""
+      onRead: function(chunk) {
+        profilesProc.bytesRead += chunk.length
+        if (profilesProc.bytesRead > 1024) {
+          profilesProc.running = false
+          return
         }
+        profilesProc.buffer += chunk
       }
     }
     onExited: {
       root.updateProfiles(profilesProc.buffer)
       profilesProc.buffer = ""
-      profilesProc.lines = 0
+      profilesProc.bytesRead = 0
     }
   }
 
@@ -312,20 +316,22 @@ Panel {
     environment: root.childEnvironment
     clearEnvironment: true
     property string buffer: ""
-    property int lines: 0
+    property int bytesRead: 0
     stdout: SplitParser {
-      splitMarker: "\n"
-      onRead: function(line) {
-        if (systemProc.lines < 20 && systemProc.buffer.length < 1024) {
-          systemProc.buffer += line + "\n"
-          systemProc.lines++
+      splitMarker: ""
+      onRead: function(chunk) {
+        systemProc.bytesRead += chunk.length
+        if (systemProc.bytesRead > 1024) {
+          systemProc.running = false
+          return
         }
+        systemProc.buffer += chunk
       }
     }
     onExited: {
       root.updateKeyValue(systemProc.buffer, "system")
       systemProc.buffer = ""
-      systemProc.lines = 0
+      systemProc.bytesRead = 0
     }
   }
 
@@ -335,20 +341,22 @@ Panel {
     environment: root.childEnvironment
     clearEnvironment: true
     property string buffer: ""
-    property int lines: 0
+    property int bytesRead: 0
     stdout: SplitParser {
-      splitMarker: "\n"
-      onRead: function(line) {
-        if (hardwareProc.lines < 20 && hardwareProc.buffer.length < 2048) {
-          hardwareProc.buffer += line + "\n"
-          hardwareProc.lines++
+      splitMarker: ""
+      onRead: function(chunk) {
+        hardwareProc.bytesRead += chunk.length
+        if (hardwareProc.bytesRead > 2048) {
+          hardwareProc.running = false
+          return
         }
+        hardwareProc.buffer += chunk
       }
     }
     onExited: {
       root.updateHardware(hardwareProc.buffer)
       hardwareProc.buffer = ""
-      hardwareProc.lines = 0
+      hardwareProc.bytesRead = 0
     }
   }
 
