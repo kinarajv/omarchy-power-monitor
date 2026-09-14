@@ -2,6 +2,8 @@
 import glob
 import json
 import os
+import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -26,6 +28,51 @@ def load_config():
         "power_label": os.getenv("POWER_LABEL", cfg.get("powerSensorLabel", "PPT")),
         "sample_delay": float(os.getenv("POWER_SAMPLE_DELAY", cfg.get("sampleDelaySeconds", 0.25)))
     }
+
+def get_charge_limit():
+    for p in glob.glob("/sys/class/power_supply/BAT*/charge_control_end_threshold"):
+        try:
+            val = int(Path(p).read_text().strip())
+            return True, val
+        except Exception:
+            return True, 100
+    return False, 100
+
+def set_charge_limit(val):
+    val = max(50, min(100, int(val)))
+    for p in glob.glob("/sys/class/power_supply/BAT*/charge_control_end_threshold"):
+        try:
+            with open(p, "w") as f:
+                f.write(f"{val}\n")
+            return True, val
+        except Exception:
+            pass
+
+    enable = (val < 100)
+    device = "/org/freedesktop/UPower/devices/battery_BAT0"
+    for d in glob.glob("/sys/class/power_supply/BAT*"):
+        name = Path(d).name
+        device = f"/org/freedesktop/UPower/devices/battery_{name}"
+        break
+
+    p = subprocess.run([
+        "/usr/bin/busctl", "call",
+        "org.freedesktop.UPower",
+        device,
+        "org.freedesktop.UPower.Device",
+        "EnableChargeThreshold",
+        "b",
+        "true" if enable else "false"
+    ], capture_output=True, text=True)
+
+    _, current = get_charge_limit()
+    return p.returncode == 0, current
+
+if len(sys.argv) > 1 and sys.argv[1] == "--set-limit":
+    target_val = int(sys.argv[2]) if len(sys.argv) > 2 else 100
+    _, cur = set_charge_limit(target_val)
+    print(f"charge_limit={cur}")
+    sys.exit(0)
 
 def cpu_sample():
     values = [int(value) for value in Path("/proc/stat").read_text().splitlines()[0].split()[1:]]
@@ -115,6 +162,8 @@ ram_total = meminfo.get("MemTotal", 1)
 ram_available = meminfo.get("MemAvailable", 0)
 ram_used = max(0, ram_total - ram_available)
 
+charge_supported, charge_limit = get_charge_limit()
+
 print(f"cpu_percent={cpu_percent:.0f}%")
 print(f"cpu_temp={cpu_temp}")
 print(f"cpu_watt={cpu_watt}")
@@ -122,3 +171,5 @@ print(f"ram_total={gib(ram_total)}")
 print(f"ram_used={gib(ram_used)}")
 print(f"ram_free={gib(ram_available)}")
 print(f"ram_percent={ram_used * 100 / ram_total:.1f}")
+print(f"charge_limit={charge_limit}")
+print(f"charge_limit_supported={'true' if charge_supported else 'false'}")

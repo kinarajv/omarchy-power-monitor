@@ -13,6 +13,7 @@ A high-performance Quickshell panel and top-bar widget for Omarchy Linux that ex
 The standard Omarchy battery widget only reports state of charge and power profile buttons. When tuning performance or diagnosing thermal throttling on laptops and handhelds, users had to launch external terminals running `btop` or `htop`.
 
 **Omarchy Power Monitor** replaces the stock widget with a complete system health HUD:
+- **Interactive Battery Limiter**: Configure and cap hardware battery charge thresholds directly from the slider on the battery bar (50%, 60%, 80% Safe mode, 100% Full charge).
 - **Instant System Pulse**: View battery charge percentage, charging rate, and power profile at a glance.
 - **CPU Telemetry**: Track real-time CPU load (`%`), package temperature (`°C`), and socket wattage (`W`).
 - **Memory Metrics**: Monitor Total RAM, Used RAM, and Free/Available RAM in GiB.
@@ -35,11 +36,21 @@ When clicked or triggered via IPC (`quickshell ipc call omarchy.power open`):
 | Section | Content | Behavior |
 | :--- | :--- | :--- |
 | **Hero Card** | Large battery icon, status phrase, charge percentage | Rotates status phrasing smoothly during charge/discharge. |
-| **Charge Bar** | Visual charge progress bar | Pulses gently while charging is active. |
+| **Charge Bar & Limiter** | Interactive charge level slider with limiter knob | Drag, click, scroll, or right-click to configure charge limit (50–100%). |
 | **Battery Details** | Time remaining, power draw, health condition | Only displays when battery hardware reports valid data. |
 | **Power Profiles** | Performance, Balanced, Power Saver buttons | Highlights active profile; clicks invoke `power-profiles-daemon`. |
 | **CPU Telemetry** | Load %, Temperature (°C), Package Power (W) | Live historical line graph, fixed 0–100% scale. |
 | **Memory Telemetry**| Total, Used, Available RAM (GiB), Used % | Dynamic auto-scaled line graph showing consumption trends. |
+
+---
+
+### Battery Charging Limiter Controls
+
+The battery bar functions as both a charge progress meter and an interactive hardware charge limiter:
+- **Click or Drag**: Move the slider knob or click anywhere along the track (50%–100%) to set the hardware charge ceiling. Common thresholds (60%, 80%, 100%) snap automatically.
+- **Right-Click**: Quickly toggles between battery preservation mode (80% Safe) and full charge (100% Max).
+- **Mouse Wheel**: Scroll up or down over the bar to step the limit by 5%.
+- **Hardware Integration**: Sets thresholds through native UPower D-Bus (unprivileged) or directly via `/sys/class/power_supply/BAT*/charge_control_end_threshold`.
 
 ---
 
@@ -155,6 +166,8 @@ ram_total=14.4 GiB
 ram_used=9.8 GiB
 ram_free=4.6 GiB
 ram_percent=68.1
+charge_limit=100
+charge_limit_supported=true
 ```
 
 Inspect Quickshell logs if the panel does not open:

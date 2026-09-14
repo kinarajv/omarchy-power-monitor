@@ -9,7 +9,7 @@ import "Model.js" as Model
 Panel {
   id: root
   moduleName: "omarchy.power"
-  ipcTarget: "omarchy.power"
+  ipcTarget: "kinara.power"
 
   manageIpc: false
   property var batteryInfo: ({})
@@ -22,6 +22,9 @@ Panel {
   property string activeProfile: ""
   property int profileIndex: 0
   property bool cursorActive: false
+  property int chargeLimit: 100
+  property bool chargeLimitSupported: true
+  property int draggingLimit: -1
   readonly property bool showPercentage: setting("showPercentage", false) === true
 
   readonly property real openPanelIndicatorWidth: showPercentage && !button.vertical ? button.glyphPaintedWidth : 0
@@ -149,22 +152,22 @@ Panel {
 
     if (!batteryProc.running) {
       batteryProc.buffer = ""
-      batteryProc.lines = 0
+      batteryProc.bytesRead = 0
       batteryProc.running = true
     }
     if (!profilesProc.running) {
       profilesProc.buffer = ""
-      profilesProc.lines = 0
+      profilesProc.bytesRead = 0
       profilesProc.running = true
     }
     if (!systemProc.running) {
       systemProc.buffer = ""
-      systemProc.lines = 0
+      systemProc.bytesRead = 0
       systemProc.running = true
     }
     if (!hardwareProc.running) {
       hardwareProc.buffer = ""
-      hardwareProc.lines = 0
+      hardwareProc.bytesRead = 0
       hardwareProc.running = true
     }
     pollWatchdog.restart()
@@ -209,6 +212,21 @@ Panel {
     hardware = next
     cpuHistory = appendHistory(cpuHistory, String(next.cpu_percent || "0").replace("%", ""))
     memoryHistory = appendHistory(memoryHistory, next.ram_percent)
+    if (next.charge_limit !== undefined) {
+      root.chargeLimit = parseInt(next.charge_limit) || 100
+    }
+    if (next.charge_limit_supported !== undefined) {
+      root.chargeLimitSupported = (next.charge_limit_supported === "true")
+    }
+  }
+
+  function setChargeLimit(percent) {
+    var val = Math.max(50, Math.min(100, Math.round(percent)))
+    root.chargeLimit = val
+    if (actionProc.running) return
+    actionProc.command = ["/usr/bin/python3", "-I", root.hardwareScript, "--set-limit", String(val)]
+    actionProc.running = true
+    actionWatchdog.restart()
   }
 
   function setProfile(profile) {
@@ -224,7 +242,7 @@ Panel {
   }
 
   IpcHandler {
-    target: "omarchy.power"
+    target: root.ipcTarget
 
     function open() { root.open() }
     function close() { root.close() }
@@ -537,35 +555,198 @@ Panel {
           }
         }
 
-        Item {
+        Column {
           width: parent.width
-          implicitHeight: Style.space(8)
+          spacing: Style.space(6)
 
-          Rectangle {
-            id: barTrack
-            anchors.fill: parent
-            radius: height / 2
-            color: Qt.rgba(root.bar.foreground.r, root.bar.foreground.g, root.bar.foreground.b, 0.12)
+          Item {
+            width: parent.width
+            implicitHeight: Math.max(chargeLeftLabel.implicitHeight, chargeRightLabel.implicitHeight)
+            visible: root.chargeLimitSupported
+
+            Text {
+              id: chargeLeftLabel
+              anchors.left: parent.left
+              text: "CHARGE"
+              color: Qt.darker(root.bar.foreground, 1.4)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+              font.bold: true
+              font.letterSpacing: 1.1
+            }
+
+            Text {
+              id: chargeRightLabel
+              anchors.right: parent.right
+              text: root.draggingLimit >= 0
+                ? (root.draggingLimit >= 100 ? "SET: 100% (OFF)" : "SET LIMIT: " + root.draggingLimit + "%")
+                : (root.chargeLimit < 100 ? "LIMIT: " + root.chargeLimit + "%" : "LIMIT: OFF (100%)")
+              color: (root.draggingLimit >= 0 || root.chargeLimit < 100) ? Color.accent : Qt.darker(root.bar.foreground, 1.4)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+              font.bold: true
+              font.letterSpacing: 1.1
+            }
           }
 
-          Rectangle {
-            id: barFill
-            anchors.left: barTrack.left
-            anchors.verticalCenter: barTrack.verticalCenter
-            height: barTrack.height
-            radius: barTrack.radius
-            color: root.batteryFillColor
-            width: Math.max(barTrack.height, barTrack.width * root.batteryFraction)
+          Item {
+            id: sliderContainer
+            width: parent.width
+            implicitHeight: Style.space(22)
 
-            Behavior on width { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
-            Behavior on color { ColorAnimation { duration: 220 } }
+            Rectangle {
+              id: barTrack
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              height: Style.space(10)
+              radius: height / 2
+              color: Qt.rgba(root.bar.foreground.r, root.bar.foreground.g, root.bar.foreground.b, 0.12)
+            }
 
-            SequentialAnimation on opacity {
-              running: root.charging && !root.fullyCharged && root.opened
-              loops: Animation.Infinite
-              alwaysRunToEnd: true
-              NumberAnimation { from: 1.0; to: 0.55; duration: 950; easing.type: Easing.InOutSine }
-              NumberAnimation { from: 0.55; to: 1.0; duration: 950; easing.type: Easing.InOutSine }
+            Rectangle {
+              id: barFill
+              anchors.left: barTrack.left
+              anchors.verticalCenter: barTrack.verticalCenter
+              height: barTrack.height
+              radius: barTrack.radius
+              color: root.batteryFillColor
+              width: Math.max(barTrack.height, Math.min(barTrack.width, barTrack.width * root.batteryFraction))
+
+              Behavior on width { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+              Behavior on color { ColorAnimation { duration: 220 } }
+
+              SequentialAnimation on opacity {
+                running: root.charging && !root.fullyCharged && root.opened
+                loops: Animation.Infinite
+                alwaysRunToEnd: true
+                NumberAnimation { from: 1.0; to: 0.55; duration: 950; easing.type: Easing.InOutSine }
+                NumberAnimation { from: 0.55; to: 1.0; duration: 950; easing.type: Easing.InOutSine }
+              }
+            }
+
+            Repeater {
+              model: [60, 80]
+              Rectangle {
+                required property int modelData
+                width: Math.max(1, Style.space(1.5))
+                height: barTrack.height + Style.space(4)
+                radius: 1
+                color: Qt.rgba(root.bar.foreground.r, root.bar.foreground.g, root.bar.foreground.b, 0.3)
+                anchors.verticalCenter: barTrack.verticalCenter
+                x: Math.round(barTrack.width * (modelData / 100.0) - width / 2)
+              }
+            }
+
+            Rectangle {
+              id: limiterKnob
+              visible: root.chargeLimitSupported
+              readonly property real effectivePercent: root.draggingLimit >= 0 ? root.draggingLimit : root.chargeLimit
+              readonly property real posFraction: Math.max(0.5, Math.min(1.0, effectivePercent / 100.0))
+              width: Style.space(12)
+              height: Style.space(18)
+              radius: Style.space(4)
+              color: root.bar.foreground
+              border.color: root.bar.background
+              border.width: Math.max(1, Style.space(1.5))
+              anchors.verticalCenter: barTrack.verticalCenter
+              x: Math.max(0, Math.min(barTrack.width - width, barTrack.width * posFraction - width / 2))
+              scale: sliderMouse.containsMouse || root.draggingLimit >= 0 ? 1.15 : 1.0
+
+              Behavior on x {
+                enabled: root.draggingLimit < 0
+                NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+              }
+              Behavior on scale {
+                NumberAnimation { duration: 110; easing.type: Easing.OutCubic }
+              }
+            }
+
+            MouseArea {
+              id: sliderMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              acceptedButtons: Qt.LeftButton | Qt.RightButton
+
+              function calculatePercent(mouseX) {
+                var frac = Math.max(0, Math.min(1, mouseX / barTrack.width))
+                var raw = Math.round(frac * 100)
+                if (Math.abs(raw - 60) <= 3) raw = 60
+                else if (Math.abs(raw - 80) <= 3) raw = 80
+                else if (raw >= 97) raw = 100
+                return Math.max(50, Math.min(100, raw))
+              }
+
+              onPressed: function(mouse) {
+                if (mouse.button === Qt.RightButton) {
+                  var nextLimit = root.chargeLimit < 100 ? 100 : 80
+                  root.setChargeLimit(nextLimit)
+                  return
+                }
+                root.draggingLimit = calculatePercent(mouse.x)
+              }
+
+              onPositionChanged: function(mouse) {
+                if (root.draggingLimit >= 0) {
+                  root.draggingLimit = calculatePercent(mouse.x)
+                }
+              }
+
+              onReleased: function(mouse) {
+                if (mouse.button !== Qt.LeftButton) return
+                if (root.draggingLimit >= 0) {
+                  root.setChargeLimit(root.draggingLimit)
+                  root.draggingLimit = -1
+                }
+              }
+
+              onWheel: function(wheel) {
+                var delta = wheel.angleDelta.y > 0 ? 5 : -5
+                var next = Math.max(50, Math.min(100, root.chargeLimit + delta))
+                root.setChargeLimit(next)
+              }
+            }
+          }
+
+          Item {
+            width: parent.width
+            implicitHeight: Style.font.caption + Style.space(2)
+            visible: root.chargeLimitSupported
+
+            Text {
+              anchors.left: parent.left
+              text: "50%"
+              color: Qt.darker(root.bar.foreground, 1.8)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+
+            Text {
+              x: Math.round(parent.width * 0.6 - width / 2)
+              text: "60%"
+              color: root.chargeLimit === 60 ? Color.accent : Qt.darker(root.bar.foreground, 1.8)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+              font.bold: root.chargeLimit === 60
+            }
+
+            Text {
+              x: Math.round(parent.width * 0.8 - width / 2)
+              text: "80%"
+              color: root.chargeLimit === 80 ? Color.accent : Qt.darker(root.bar.foreground, 1.8)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+              font.bold: root.chargeLimit === 80
+            }
+
+            Text {
+              anchors.right: parent.right
+              text: "100%"
+              color: root.chargeLimit === 100 ? Color.accent : Qt.darker(root.bar.foreground, 1.8)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+              font.bold: root.chargeLimit === 100
             }
           }
         }
